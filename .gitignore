@@ -1,5 +1,5 @@
 settings.py
-__pychache__/**
+__pycache__
 extensions/__pycache__/**
 .vscode
 

@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import random
 import settings
+import requests
 
 class Fun(commands.Cog):
 
@@ -27,12 +28,29 @@ class Fun(commands.Cog):
             'Bingo, bango, bongo, bish, bash, bosh!',
             'rare golden kappa'
         ]
-        await ctx.send(embed = discord.Embed(description=f'Question: {question}\nAnswer: {random.choice(responses)}',color=settings.color))
-
+        await ctx.send(embed = discord.Embed(description=f'Question: {question}\nAnswer: {random.choice(responses)}',color=settings.color))#
     # @ama.error
     # async def ama_error(self,ctx,error):
     #     if isinstance(error, commands.MissingRequiredArgument):
     #         await ctx.send('Argument missing')
+
+    @commands.command()
+    async def dad_joke(self,ctx):
+        r = requests.get("https://icanhazdadjoke.com/",headers={"Accept":"application/json"})
+        data = r.json()
+        await ctx.send(embed = discord.Embed(description=data['joke'],color=settings.color))
+
+    @commands.command()
+    async def star_wars(self,ctx):
+         r = requests.get("http://swquotesapi.digitaljedi.dk/api/SWQuote/RandomStarWarsQuote")
+         data = r.json()
+         await ctx.send(embed = discord.Embed(description=data['starWarsQuote'],color=settings.color))
+
+    @commands.command()
+    async def meme(self,ctx):
+         r = requests.get("https://meme-api.herokuapp.com/gimme")
+         data = r.json()
+         await ctx.send(data['url'])
 
 def setup(client):
     client.add_cog(Fun(client))

@@ -11,10 +11,12 @@ class Fun(commands.Cog):
 
     @commands.command()
     async def echo(self,ctx,message):
-         await ctx.send(embed = discord.Embed(description="**{}**".format(message),color=settings.color))
+        """Bot makes an echo"""
+        await ctx.send(embed = discord.Embed(description="**{}**".format(message),color=settings.color))
 
     @commands.command()
     async def ama(self,ctx,question):
+        """Answers questions randomly"""
         responses = [
             'It is known.',
             'You are gay',
@@ -28,29 +30,32 @@ class Fun(commands.Cog):
             'Bingo, bango, bongo, bish, bash, bosh!',
             'rare golden kappa'
         ]
-        await ctx.send(embed = discord.Embed(description=f'Question: {question}\nAnswer: {random.choice(responses)}',color=settings.color))#
+        await ctx.send(embed = discord.Embed(description=f'Question: {question}\nAnswer: {random.choice(responses)}',color=settings.color))
+
     # @ama.error
     # async def ama_error(self,ctx,error):
     #     if isinstance(error, commands.MissingRequiredArgument):
     #         await ctx.send('Argument missing')
-
     @commands.command()
     async def dad_joke(self,ctx):
+        """Makes bad puns"""
         r = requests.get("https://icanhazdadjoke.com/",headers={"Accept":"application/json"})
         data = r.json()
         await ctx.send(embed = discord.Embed(description=data['joke'],color=settings.color))
 
     @commands.command()
     async def star_wars(self,ctx):
-         r = requests.get("http://swquotesapi.digitaljedi.dk/api/SWQuote/RandomStarWarsQuote")
-         data = r.json()
-         await ctx.send(embed = discord.Embed(description=data['starWarsQuote'],color=settings.color))
+        """Posts a star wars quote"""
+        r = requests.get("http://swquotesapi.digitaljedi.dk/api/SWQuote/RandomStarWarsQuote")
+        data = r.json()
+        await ctx.send(embed = discord.Embed(description=data['starWarsQuote'],color=settings.color))
 
     @commands.command()
     async def meme(self,ctx):
-         r = requests.get("https://meme-api.herokuapp.com/gimme")
-         data = r.json()
-         await ctx.send(data['url'])
+        """Posts dank memes"""
+        r = requests.get("https://meme-api.herokuapp.com/gimme")
+        data = r.json()
+        await ctx.send(data['url'])
 
 def setup(client):
     client.add_cog(Fun(client))

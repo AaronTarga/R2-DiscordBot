@@ -13,8 +13,9 @@ class Super(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def clean(self,ctx,amount=5):
-       deleted = await ctx.channel.purge(limit=amount)
-       await ctx.chanel.send(embed = discord.Embed(description="**Deleted {} message(s)**".format(len(deleted)),color=settings.color))
+        "Cleans given amount of messages(only for people who can delete messages)"
+        deleted = await ctx.channel.purge(limit=amount)
+        await ctx.send(embed = discord.Embed(description='**Deleted {} message(s)**'.format(len(deleted)),color=settings.color))
 
 def setup(client):
     client.add_cog(Super(client))

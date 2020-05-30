@@ -13,24 +13,36 @@ async def on_ready():
     print('Bot is ready')
 
 @bot.command()
+@commands.has_permissions(administrator=True)
 async def load(ctx, extension):
+    """Loads given extension(only for admins)"""
     bot.load_extension(f'extensions.{extension}')
+    await ctx.send(embed = discord.Embed(description='Extension has been loaded!',color=settings.color))
 
 @bot.command()
+@commands.has_permissions(administrator=True)
 async def unload(ctx, extension):
+    """Temporarly disables given extension(only for admins)"""
     bot.unload_extension(f'extensions.{extension}')
+    await ctx.send(embed = discord.Embed(description='Extension has been disabled!',color=settings.color))
 
 @bot.command(name="reload")
+@commands.has_permissions(administrator=True)
 async def reloadSingle(ctx, extension):
+    """Reloads given extension(only for admins)"""
     bot.unload_extension(f'extensions.{extension}')
     bot.load_extension(f'extensions.{extension}')
+    await ctx.send(embed = discord.Embed(description='Extension has been reloaded!',color=settings.color))
 
 @bot.command(name="reload_all")
+@commands.has_permissions(administrator=True)
 async def reloadAll(ctx):
+    """Reloads all extensions(only for admins)"""
     for fileName in os.listdir('./extensions'):
         if fileName.endswith('.py'):
             bot.unload_extension(f'extensions.{fileName[:-3]}')
             bot.load_extension(f'extensions.{fileName[:-3]}')
+    await ctx.send(embed = discord.Embed(description='Extensions have been reloaded!',color=settings.color))
 
 @bot.event
 async def on_command_error(ctx,error):

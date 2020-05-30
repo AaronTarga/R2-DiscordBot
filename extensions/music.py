@@ -86,7 +86,8 @@ class Music(commands.Cog):
             else:
                 queue.append(url)
 
-        await ctx.send(embed = discord.Embed(description="Loading songs from playlist into queue!", color = settings.color))
+        #could take long if it has to load big playlists
+        await ctx.send(embed = discord.Embed(description="Loading song/songs from url!", color = settings.color))
         data = ytdl.extract_info(queue[0], download=False)
         if 'entries' in data:
             queue.pop(0)

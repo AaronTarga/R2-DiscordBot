@@ -13,7 +13,6 @@ ytdl_format_options = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
-    'noplaylist': True,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
@@ -87,11 +86,15 @@ class Music(commands.Cog):
             else:
                 queue.append(url)
 
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(queue[0], download=True))
+        await ctx.send(embed = discord.Embed(description="Loading songs from playlist into queue!", color = settings.color))
+        data = ytdl.extract_info(queue[0], download=False)
         if 'entries' in data:
-            # take first item from a playlist
-            data = data['entries'][0]
+            queue.pop(0)
+            #going through all songs in playlist and adding to queue
+            for i,item in enumerate(data['entries']):
+                queue.append(data['entries'][i]['webpage_url']  )
+            await ctx.send(embed = discord.Embed(description=" Finished Loading songs into playlist:", color = settings.color))
+        data = ytdl.extract_info(queue[0], download=True)
         filename = ytdl.prepare_filename(data)
         source = discord.PCMVolumeTransformer( discord.FFmpegPCMAudio(filename, **ffmpeg_options),volume = global_volume)
         ctx.voice_client.play(source,
@@ -138,7 +141,15 @@ class Music(commands.Cog):
             await ctx.voice_client.stop()
 
     def delete_music_files(self):
-        for f in  glob.glob("*.webm"):
+        files = glob.glob("*.webm")
+        files.extend(glob.glob("*.mp3"))
+        files.extend(glob.glob("*.m4a"))
+        files.extend(glob.glob("*.ogg"))
+        files.extend(glob.glob("*.m4p"))
+        files.extend(glob.glob("*.wma"))
+        files.extend(glob.glob("*.flac"))
+        files.extend(glob.glob("*.mp4"))
+        for f in files:
             os.remove(f)
 
     @commands.command(pass_context=True, no_pm=True)

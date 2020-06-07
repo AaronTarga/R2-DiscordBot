@@ -70,10 +70,9 @@ class Music(commands.Cog):
     async def volume(self, ctx, volume: int):
         """Changes the player's volume"""
 
-        if ctx.voice_client is None:
-            return await ctx.send(embed = discord.Embed(description="Not connected to a voice channel.",color=settings.error_color))
+        if ctx.voice_client is not None:
+            ctx.voice_client.source.volume = volume / 100
 
-        ctx.voice_client.source.volume = volume / 100
         global global_volume
         global_volume = volume / 100
         await ctx.send(embed = discord.Embed(description="**Changed volume to {}%**".format(volume),color=settings.color))
@@ -81,6 +80,9 @@ class Music(commands.Cog):
     @commands.command(aliases=["leave"])
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
+        if ctx.voice_client is None:
+            return await ctx.send(embed = discord.Embed(description="Must join channel to be able to leave channel",color=settings.error_color))
+
         await self.clear(ctx)
 
         await ctx.voice_client.disconnect()
@@ -105,6 +107,7 @@ class Music(commands.Cog):
         except Exception:
            await ctx.send(embed = discord.Embed(description=" Couldn't retrieve song data", color = settings.error_color))
            queue.pop(index)
+           signal.alarm(0)
            return
         #cancel interrupt
         signal.alarm(0)
@@ -170,6 +173,9 @@ class Music(commands.Cog):
     @commands.command()
     async def skip(self,ctx,count: int = 1):
         """Let's you skip a specific number of songs"""
+        if ctx.voice_client is None or not ctx.voice_client.is_playing():
+            return await ctx.send(embed = discord.Embed(description="No song to skip",color=settings.error_color))
+
         if(count > 0 and count < len(queue)):
             for i in range(1,count):
                 queue.pop(0)
@@ -184,13 +190,19 @@ class Music(commands.Cog):
     @commands.command()
     async def current(self,ctx):
         """Gives info about the current song"""
+
+        if ctx.voice_client is None or not ctx.voice_client.is_playing():
+            return await ctx.send(embed = discord.Embed(description="Not connected to a voice channel.",color=settings.error_color))
+
         if song_titles:
             await ctx.send(embed = discord.Embed(title="**Currently playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(song_titles[0], queue[0], int(global_volume*100)), color = settings.color))
         else:
             await ctx.send(embed = discord.Embed(description="Currrently no song is playing",color=settings.error_color))
+
     @commands.command()
     async def queue(self,ctx):
         """lists current songs in queue"""
+
         await self.print_queue(ctx)
 
     async def print_queue(self,ctx):
@@ -239,6 +251,10 @@ class Music(commands.Cog):
     @commands.command(pass_context=True, no_pm=True)
     async def pause(self, ctx):
         """pauses currently played song"""
+
+        if ctx.voice_client is None:
+            return await ctx.send(embed = discord.Embed(description="Bot is not connected to voice channel",color=settings.error_color))
+
         if ctx.voice_client.is_playing():
             ctx.voice_client.pause()
         else:
@@ -247,6 +263,10 @@ class Music(commands.Cog):
     @commands.command(pass_context=True, no_pm=True)
     async def resume(self, ctx):
         """resumes currently played song"""
+
+        if ctx.voice_client is None:
+            return await ctx.send(embed = discord.Embed(description="Bot is not connected to voice channel",color=settings.error_color))
+
         if not ctx.voice_client.is_playing():
             ctx.voice_client.resume()
         else:

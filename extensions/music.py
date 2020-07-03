@@ -6,6 +6,7 @@ from discord.ext import commands
 import glob
 import settings
 import signal
+import time
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -22,7 +23,7 @@ ytdl_format_options_playlist = {
     'flat-playlist': True,
     'default_search': 'auto',
     # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'source_address': '0.0.0.0'
+    # 'source_address': '0.0.0.0'
 }
 
 ytdl_format_options = {
@@ -37,7 +38,7 @@ ytdl_format_options = {
     'noplaylist': True,
     'default_search': 'auto',
     # bind to ipv4 since ipv6 addresses cause issues sometimes
-    'source_address': '0.0.0.0'
+    # 'source_address': '0.0.0.0'
 }
 
 ffmpeg_options = {
@@ -50,6 +51,9 @@ queue = []
 song_titles = []
 
 global_volume = 0.5
+
+timeout = 60
+
 
 class Music(commands.Cog):
 
@@ -77,17 +81,24 @@ class Music(commands.Cog):
         global_volume = volume / 100
         await ctx.send(embed=discord.Embed(description="**Changed volume to {}%**".format(volume), color=settings.color))
 
+    async def sleep_stop(self,ctx):
+        await asyncio.sleep(timeout)
+        if not queue or len(queue) < 1:
+            print("Bot inactive and no more songs to be played")
+            await self.stop(ctx)
+
     @commands.command(aliases=["leave"])
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
         if ctx.voice_client is None:
             return await ctx.send(embed=discord.Embed(description="Must join channel to be able to leave channel", color=settings.error_color))
 
-        await self.clear(ctx)
+        if queue and len(queue) > 0:
+            await self.clear(ctx)
 
         await ctx.voice_client.disconnect()
 
-    def handler(self, signum, frame):
+    def music_not_found_handler(self, signum, frame):
         print("Timeout has been reached")
         raise Exception("end of time")
 
@@ -99,8 +110,8 @@ class Music(commands.Cog):
             index = len(queue) - 1
 
         # if it isn't finished until 20 seconds it gets interrupted
-        signal.signal(signal.SIGALRM, self.handler)
-        signal.alarm(60)
+        signal.signal(signal.SIGALRM, self.music_not_found_handler)
+        signal.alarm(timeout)
 
         try:
             data = ytdl.extract_info(queue[index], download=False)
@@ -138,6 +149,7 @@ class Music(commands.Cog):
                     song_titles.pop(0)
                 await ctx.send(embed=discord.Embed(description="There are no more songs to be played!", color=settings.color))
                 self.delete_music_files()
+                await self.sleep_stop(ctx)
                 return
         else:
             if queue:
@@ -249,6 +261,7 @@ class Music(commands.Cog):
         files.extend(glob.glob("*.wma"))
         files.extend(glob.glob("*.flac"))
         files.extend(glob.glob("*.mp4"))
+        files.extend(glob.glob("*.wav"))
         for f in files:
             os.remove(f)
 
@@ -281,6 +294,11 @@ class R2D2(commands.Cog):
     def __init__(self, client):
         self.client = client
 
+    async def leave(self,ctx):
+        await asyncio.sleep(5)
+        if not queue or len(queue) < 1:
+            await ctx.voice_client.disconnect()
+
     async def join(self, ctx):
         channel = ctx.message.author.voice.channel
 
@@ -289,84 +307,59 @@ class R2D2(commands.Cog):
 
         await channel.connect()
 
+    async def playing_sound(self,ctx,filename):
+        if not queue or len(queue) < 1:
+
+            await self.join(ctx)
+            dirname = os.path.dirname(__file__)
+            filename = os.path.join(dirname,filename)
+            source = discord.PCMVolumeTransformer(
+                discord.FFmpegPCMAudio(filename), volume=global_volume)
+
+            ctx.voice_client.play(source,
+                                    after=lambda e: print('Player error: %s' % e) if e else None)
+
+            await self.leave(ctx)
+
+        else:
+            await ctx.send(embed=discord.Embed(description="**Bot plays music currently**", color=settings.error_color))
+
     @commands.command(pass_context=True)
     async def r2_scream(self, ctx):
         """Maken yousa comfortable"""
 
-        await self.join(ctx)
-
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/R2 screaming.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
+        await self.playing_sound(ctx,"../Sounds/R2 screaming.mp3")
 
     @commands.command(pass_context=True)
     async def r2_concerned(self, ctx):
         """Mesa concerned"""
 
-        await self.join(ctx)
-
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/Concerned R2D2.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
+        await self.playing_sound(ctx,"../Sounds/Concerned R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_excited(self, ctx):
         """Gets yousa goen"""
 
-        await self.join(ctx)
+        await self.playing_sound(ctx,"../Sounds/Excited R2D2.mp3")
 
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/Excited R2D2.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
 
     @commands.command(pass_context=True)
     async def r2_laughing(self, ctx):
         """**Menacingly laughs**"""
 
-        await self.join(ctx)
-
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/Laughing R2D2.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
+        await self.playing_sound(ctx,"../Sounds/Laughing R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_sad(self, ctx):
         """Gives yousa depression """
 
-        await self.join(ctx)
-
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/Sad R2D2.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
+        await self.playing_sound(ctx,"../Sounds/Sad R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_real_exciting(self, ctx):
         """Mesa really excited"""
 
-        await self.join(ctx)
-
-        dirname = os.path.dirname(__file__)
-        filename = os.path.join(dirname, "../Sounds/Very Excited R2D2.mp3")
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(filename), volume=global_volume)
-        ctx.voice_client.play(source, after=lambda e: print(
-            'Player error: %s' % e) if e else None)
-
+        await self.playing_sound(ctx,"../Sounds/Very Excited R2D2.mp3")
 
 def setup(client):
     client.add_cog(Music(client))

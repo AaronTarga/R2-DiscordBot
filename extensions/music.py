@@ -63,12 +63,15 @@ class Music(commands.Cog):
     @commands.command(pass_context=True)
     async def join(self, ctx):
         """Joins a voice channel"""
-        channel = ctx.message.author.voice.channel
+        if ctx.message.author.voice:
+            channel = ctx.message.author.voice.channel
 
-        if ctx.voice_client is not None:
-            return await ctx.voice_client.move_to(channel)
+            if ctx.voice_client != None:
+                return await ctx.voice_client.move_to(channel)
 
-        await channel.connect()
+            await channel.connect()
+        else:
+            raise Exception
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -81,11 +84,12 @@ class Music(commands.Cog):
         global_volume = volume / 100
         await ctx.send(embed=discord.Embed(description="**Changed volume to {}%**".format(volume), color=settings.color))
 
-    async def sleep_stop(self,ctx):
+    async def sleep_stop(self, ctx):
         await asyncio.sleep(timeout)
         if not queue or len(queue) < 1:
             print("Bot inactive and no more songs to be played")
-            await self.stop(ctx)
+            if ctx.voice_client != None:
+                await self.stop(ctx)
 
     @commands.command(aliases=["leave"])
     async def stop(self, ctx):
@@ -172,7 +176,10 @@ class Music(commands.Cog):
     @commands.command()
     async def play(self, ctx, url, playlist: int = 0):
         """Plays from a url (almost anything youtube_dl supports) when adding number greater 1 at end it queues playlists"""
-        await self.join(ctx)
+        try:
+            await self.join(ctx)
+        except:
+            return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
         global ytdl
         if playlist:
@@ -294,30 +301,37 @@ class R2D2(commands.Cog):
     def __init__(self, client):
         self.client = client
 
-    async def leave(self,ctx):
+    async def leave(self, ctx):
         await asyncio.sleep(5)
         if not queue or len(queue) < 1:
             await ctx.voice_client.disconnect()
 
     async def join(self, ctx):
-        channel = ctx.message.author.voice.channel
+        if ctx.message.author.voice:
+            channel = ctx.message.author.voice.channel
 
-        if ctx.voice_client is not None:
-            return await ctx.voice_client.move_to(channel)
+            if ctx.voice_client != None:
+                return await ctx.voice_client.move_to(channel)
 
-        await channel.connect()
+            await channel.connect()
+        else:
+            raise Exception
 
-    async def playing_sound(self,ctx,filename):
+    async def playing_sound(self, ctx, filename):
         if not queue or len(queue) < 1:
 
-            await self.join(ctx)
+            try:
+                await self.join(ctx)
+            except:
+                return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
+
             dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname,filename)
+            filename = os.path.join(dirname, filename)
             source = discord.PCMVolumeTransformer(
                 discord.FFmpegPCMAudio(filename), volume=global_volume)
 
             ctx.voice_client.play(source,
-                                    after=lambda e: print('Player error: %s' % e) if e else None)
+                                  after=lambda e: print('Player error: %s' % e) if e else None)
 
             await self.leave(ctx)
 
@@ -328,38 +342,38 @@ class R2D2(commands.Cog):
     async def r2_scream(self, ctx):
         """Maken yousa comfortable"""
 
-        await self.playing_sound(ctx,"../Sounds/R2 screaming.mp3")
+        await self.playing_sound(ctx, "../Sounds/R2 screaming.mp3")
 
     @commands.command(pass_context=True)
     async def r2_concerned(self, ctx):
         """Mesa concerned"""
 
-        await self.playing_sound(ctx,"../Sounds/Concerned R2D2.mp3")
+        await self.playing_sound(ctx, "../Sounds/Concerned R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_excited(self, ctx):
         """Gets yousa goen"""
 
-        await self.playing_sound(ctx,"../Sounds/Excited R2D2.mp3")
-
+        await self.playing_sound(ctx, "../Sounds/Excited R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_laughing(self, ctx):
         """**Menacingly laughs**"""
 
-        await self.playing_sound(ctx,"../Sounds/Laughing R2D2.mp3")
+        await self.playing_sound(ctx, "../Sounds/Laughing R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_sad(self, ctx):
         """Gives yousa depression """
 
-        await self.playing_sound(ctx,"../Sounds/Sad R2D2.mp3")
+        await self.playing_sound(ctx, "../Sounds/Sad R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_real_exciting(self, ctx):
         """Mesa really excited"""
 
-        await self.playing_sound(ctx,"../Sounds/Very Excited R2D2.mp3")
+        await self.playing_sound(ctx, "../Sounds/Very Excited R2D2.mp3")
+
 
 def setup(client):
     client.add_cog(Music(client))

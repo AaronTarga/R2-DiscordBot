@@ -77,6 +77,9 @@ class Music(commands.Cog):
     async def volume(self, ctx, volume: int):
         """Changes the player's volume"""
 
+        if volume > 100 or volume < 0:
+            return await ctx.send(embed=discord.Embed(description="Volume can only be set between 0 and 100", color=settings.error_color))
+
         if ctx.voice_client is not None:
             ctx.voice_client.source.volume = volume / 100
 
@@ -200,6 +203,10 @@ class Music(commands.Cog):
             return await ctx.send(embed=discord.Embed(description="No song to skip", color=settings.error_color))
 
         if(count > 0 and queue and count < len(queue)):
+            '''
+            range starts from 1 because current song already out of queue so if only 1 gets skipped player just needs to be stopped
+            and then it will execute it's after function which causes the next song in the queue to play
+            '''
             for i in range(1, count):
                 queue.pop(0)
                 song_titles.pop(0)
@@ -208,7 +215,10 @@ class Music(commands.Cog):
             if queue and len(queue) > 1:
                 await ctx.send(embed=discord.Embed(description="You can only skip positive numbers and to songs in the queue, not greater or smaller numbers!", color=settings.error_color))
             else:
-                await ctx.send(embed=discord.Embed(description="There are no more songs in the queue!", color=settings.error_color))
+                if ctx.voice_client.is_playing():
+                    await ctx.voice_client.stop()
+                else:
+                    await ctx.send(embed=discord.Embed(description="There are no songs to skip!", color=settings.error_color))
 
     @commands.command()
     async def current(self, ctx):

@@ -8,6 +8,7 @@ import settings
 import signal
 import time
 from collections import defaultdict
+import re
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -57,6 +58,59 @@ global_volume = defaultdict(lambda: 0.5)
 timeout = 60
 
 
+async def join(ctx):
+    if ctx.message.author.voice:
+        channel = ctx.message.author.voice.channel
+
+        if ctx.voice_client != None:
+            return await ctx.voice_client.move_to(channel)
+
+        await channel.connect()
+    else:
+        raise Exception
+
+
+async def stop(ctx):
+    if ctx.voice_client is None:
+        return await ctx.send(embed=discord.Embed(description="Must join channel to be able to leave channel", color=settings.error_color))
+
+    if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 0:
+        await Music.clear(ctx)
+
+    await ctx.voice_client.disconnect()
+
+
+async def resume_prev(ctx, backup):
+    await asyncio.sleep(5)
+    if backup:
+        ctx.voice_client.play(discord.PCMVolumeTransformer(backup),
+                              after=lambda e: print('Player error: %s' % e) if e else Music.play_next(ctx))
+    else:
+        await ctx.voice_client.disconnect()
+
+
+async def playing_sound(ctx, filename):
+    backup = None
+    if ctx.voice_client.is_playing():
+        backup = ctx.voice_client.source
+        ctx.voice_client.pause()
+    else:
+        try:
+            await join(ctx)
+        except:
+            return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
+
+    dirname = os.path.dirname(__file__)
+    filename = os.path.join(dirname, filename)
+    source = discord.PCMVolumeTransformer(
+        discord.FFmpegPCMAudio(filename), volume=global_volume[ctx.guild.id])
+
+    ctx.voice_client.play(source,
+                          after=lambda e: print('Player error: %s' % e) if e else None)
+
+    await resume_prev(ctx, backup)
+
+
 class Music(commands.Cog):
 
     def __init__(self, client):
@@ -65,15 +119,7 @@ class Music(commands.Cog):
     @commands.command(pass_context=True)
     async def join(self, ctx):
         """Joins a voice channel"""
-        if ctx.message.author.voice:
-            channel = ctx.message.author.voice.channel
-
-            if ctx.voice_client != None:
-                return await ctx.voice_client.move_to(channel)
-
-            await channel.connect()
-        else:
-            raise Exception
+        join(ctx)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -89,28 +135,25 @@ class Music(commands.Cog):
         global_volume[ctx.guild.id] = float(volume) / 100.0
         await ctx.send(embed=discord.Embed(description="**Changed volume to {}%**".format(volume), color=settings.color))
 
-    async def sleep_stop(self, ctx):
+    @staticmethod
+    async def sleep_stop(ctx):
         await asyncio.sleep(timeout)
         if not queues[ctx.guild.id] or len(queues[ctx.guild.id]) < 1:
             if ctx.voice_client != None:
-                await self.stop(ctx)
+                await stop(ctx)
 
     @commands.command(aliases=["leave"])
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
-        if ctx.voice_client is None:
-            return await ctx.send(embed=discord.Embed(description="Must join channel to be able to leave channel", color=settings.error_color))
+        await stop(ctx)
 
-        if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 0:
-            await self.clear(ctx)
-
-        await ctx.voice_client.disconnect()
-
-    def music_not_found_handler(self, signum, frame):
+    @staticmethod
+    def music_not_found_handler(signum, frame):
         print("Timeout has been reached")
         raise Exception("end of time")
 
-    async def append_song(self, ctx, appended=False):
+    @staticmethod
+    async def append_song(ctx, appended=False):
         # could take long if it has to load big playlists
         await ctx.send(embed=discord.Embed(description="Loading song/songs from url!", color=settings.color))
         index = 0
@@ -118,7 +161,7 @@ class Music(commands.Cog):
             index = len(queues[ctx.guild.id]) - 1
 
         # if it isn't finished until 20 seconds it gets interrupted
-        signal.signal(signal.SIGALRM, self.music_not_found_handler)
+        signal.signal(signal.SIGALRM, Music.music_not_found_handler)
         signal.alarm(timeout)
 
         try:
@@ -142,13 +185,22 @@ class Music(commands.Cog):
                     song_titles[ctx.guild.id].append(
                         data['entries'][i]['title'])
                 await ctx.send(embed=discord.Embed(description=" Finished Loading songs into playlist:", color=settings.color))
-                await self.print_queue(ctx)
+                await Music.print_queue(ctx)
             else:
-                song_titles[ctx.guild.id].append(data.get('title'))
-                if len(queues[ctx.guild.id]) > 1 and appended:
-                    await ctx.send(embed=discord.Embed(description="Song [{}]({}) got queued in {}. position".format(data.get('title'), queues[ctx.guild.id][len(queues[ctx.guild.id])-1], len(queues[ctx.guild.id])-1), color=settings.color))
+                title = data.get('title')
+                for bad in settings.bad_music:
+                    # if music title conatins filter word, troll message gets played and afterwards music continues
+                    if re.match(f".*{bad}.*", title, re.IGNORECASE):
+                        queues[ctx.guild.id].pop(len(queues[ctx.guild.id])-1)
 
-    async def play_music(self, ctx, url=None):
+                        await Music.play_random(ctx)
+                        return
+                song_titles[ctx.guild.id].append(title)
+                if len(queues[ctx.guild.id]) > 1 and appended:
+                    await ctx.send(embed=discord.Embed(description="Song [{}]({}) got queued in {}. position".format(title, queues[ctx.guild.id][len(queues[ctx.guild.id])-1], len(queues[ctx.guild.id])-1), color=settings.color))
+
+    @staticmethod
+    async def play_music(ctx, url=None):
 
         if url is None:
             if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
@@ -159,24 +211,24 @@ class Music(commands.Cog):
                     queues[ctx.guild.id].pop(0)
                     song_titles[ctx.guild.id].pop(0)
                 await ctx.send(embed=discord.Embed(description="There are no more songs to be played!", color=settings.color))
-                self.delete_music_files()
-                await self.sleep_stop(ctx)
+                Music.delete_music_files()
+                await Music.sleep_stop(ctx)
                 return
         else:
             if queues[ctx.guild.id]:
                 queues[ctx.guild.id].append(url)
-                await self.append_song(ctx, True)
+                await Music.append_song(ctx, True)
                 return
             else:
                 queues[ctx.guild.id].append(url)
-                await self.append_song(ctx)
+                await Music.append_song(ctx)
         if queues[ctx.guild.id]:
             data = ytdl.extract_info(queues[ctx.guild.id][0], download=True)
             filename = ytdl.prepare_filename(data)
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(
                 filename, **ffmpeg_options), volume=global_volume[ctx.guild.id])
             ctx.voice_client.play(source,
-                                  after=lambda e: print('Player error: %s' % e) if e else self.play_next(ctx))
+                                  after=lambda e: print('Player error: %s' % e) if e else Music.play_next(ctx))
 
             await ctx.send(embed=discord.Embed(title="**Now playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(data.get('title'), queues[ctx.guild.id][0], int(global_volume[ctx.guild.id]*100)), color=settings.color))
 
@@ -184,7 +236,7 @@ class Music(commands.Cog):
     async def play(self, ctx, url, playlist: int = 0):
         """Plays from a url (almost anything youtube_dl supports) when adding number greater 1 at end it queues playlists"""
         try:
-            await self.join(ctx)
+            await join(ctx)
         except:
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
@@ -194,11 +246,13 @@ class Music(commands.Cog):
         else:
             ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
-        await self.play_music(ctx, url)
-
-    def play_next(self, ctx):
         asyncio.run_coroutine_threadsafe(
-            self.play_music(ctx), self.client.loop)
+            Music.play_music(ctx, url), ctx.voice_client.loop)
+
+    @staticmethod
+    def play_next(ctx):
+        asyncio.run_coroutine_threadsafe(
+            Music.play_music(ctx), ctx.voice_client.loop)
 
     @commands.command()
     async def skip(self, ctx, count: int = 1):
@@ -220,6 +274,7 @@ class Music(commands.Cog):
                 await ctx.send(embed=discord.Embed(description="You can only skip positive numbers and to songs in the queue, not greater or smaller numbers!", color=settings.error_color))
             else:
                 if ctx.voice_client.is_playing():
+                    print(ctx.voice_client)
                     await ctx.voice_client.stop()
                 else:
                     await ctx.send(embed=discord.Embed(description="There are no songs to skip!", color=settings.error_color))
@@ -242,7 +297,8 @@ class Music(commands.Cog):
 
         await self.print_queue(ctx)
 
-    async def print_queue(self, ctx):
+    @staticmethod
+    async def print_queue(ctx):
         if queues[ctx.guild.id] and len(song_titles[ctx.guild.id]) > 1:
             title = "**Songs currently in queue:**"
             queue_pretty = ""
@@ -258,22 +314,24 @@ class Music(commands.Cog):
     @commands.command(aliases=["clear"])
     async def clear_queue(self, ctx):
         """clears queue"""
-        await self.clear(ctx)
+        await Music.clear(ctx)
         if ctx.voice_client is not None and ctx.voice_client.is_playing():
             await ctx.voice_client.stop()
 
-    async def clear(self, ctx):
+    @staticmethod
+    async def clear(ctx):
         global queues
         global song_titles
 
         queues[ctx.guild.id] = []
         song_titles[ctx.guild.id] = []
 
-        self.delete_music_files()
+        Music.delete_music_files()
 
         await ctx.send(embed=discord.Embed(description="**Queue has been cleared!**", color=settings.color))
 
-    def delete_music_files(self):
+    @staticmethod
+    def delete_music_files():
         files = glob.glob("*.webm")
         files = glob.glob("*.webm")
         files.extend(glob.glob("*.mp3"))
@@ -311,83 +369,53 @@ class Music(commands.Cog):
         else:
             await ctx.send(embed=discord.Embed(description="**Player is running already**", color=settings.error_color))
 
+    @staticmethod
+    async def play_random(ctx):
+
+        filename = "../Sounds/ask_again.mp3"
+
+        await playing_sound(ctx, filename)
+
 
 class R2D2(commands.Cog):
     def __init__(self, client):
         self.client = client
 
-    async def leave(self, ctx):
-        await asyncio.sleep(5)
-        if not queues[ctx.guild.id] or len(queues[ctx.guild.id]) < 1:
-            await ctx.voice_client.disconnect()
-
-    async def join(self, ctx):
-        if ctx.message.author.voice:
-            channel = ctx.message.author.voice.channel
-
-            if ctx.voice_client != None:
-                return await ctx.voice_client.move_to(channel)
-
-            await channel.connect()
-        else:
-            raise Exception
-
-    async def playing_sound(self, ctx, filename):
-        if not queues[ctx.guild.id] or len(queues[ctx.guild.id]) < 1:
-
-            try:
-                await self.join(ctx)
-            except:
-                return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
-
-            dirname = os.path.dirname(__file__)
-            filename = os.path.join(dirname, filename)
-            source = discord.PCMVolumeTransformer(
-                discord.FFmpegPCMAudio(filename), volume=global_volume[ctx.guild.id])
-
-            ctx.voice_client.play(source,
-                                  after=lambda e: print('Player error: %s' % e) if e else None)
-
-            await self.leave(ctx)
-
-        else:
-            await ctx.send(embed=discord.Embed(description="**Bot plays music currently**", color=settings.error_color))
-
     @commands.command(pass_context=True)
     async def r2_scream(self, ctx):
         """Maken yousa comfortable"""
 
-        await self.playing_sound(ctx, "../Sounds/R2 screaming.mp3")
+        await playing_sound(ctx, "../Sounds/R2 screaming.mp3")
 
     @commands.command(pass_context=True)
     async def r2_concerned(self, ctx):
         """Mesa concerned"""
 
-        await self.playing_sound(ctx, "../Sounds/Concerned R2D2.mp3")
+        await playing_sound(ctx, "../Sounds/Concerned R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_excited(self, ctx):
         """Gets yousa goen"""
 
-        await self.playing_sound(ctx, "../Sounds/Excited R2D2.mp3")
+        await playing_sound(ctx, "../Sounds/Excited R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_laughing(self, ctx):
         """**Menacingly laughs**"""
 
-        await self.playing_sound(ctx, "../Sounds/Laughing R2D2.mp3")
+        await playing_sound(ctx, "../Sounds/Laughing R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_sad(self, ctx):
         """Gives yousa depression """
 
-        await self.playing_sound(ctx, "../Sounds/Sad R2D2.mp3")
+        await playing_sound(ctx, "../Sounds/Sad R2D2.mp3")
 
     @commands.command(pass_context=True)
     async def r2_real_exciting(self, ctx):
         """Mesa really excited"""
 
-        await self.playing_sound(ctx, "../Sounds/Very Excited R2D2.mp3")
+        await playing_sound(ctx, "../Sounds/Very Excited R2D2.mp3")
 
 
 def setup(client):

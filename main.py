@@ -44,12 +44,30 @@ async def reloadAll(ctx):
             bot.load_extension(f'extensions.{fileName[:-3]}')
     await ctx.send(embed = discord.Embed(description='Extensions have been reloaded!',color=settings.color))
 
+@bot.command(name="server")
+async def getServer(ctx):
+    """Prints the name of the server"""
+    await ctx.send(embed = discord.Embed(description=f'Name of the server: {ctx.guild}',color=settings.color))
+
+@bot.command(name="server_id")
+async def getServerId(ctx):
+    """Prints the id of the server"""
+    await ctx.send(embed = discord.Embed(description=f'Id of the server: {ctx.guild.id}',color=settings.color))
+
 @bot.event
 async def on_command_error(ctx,error):
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(embed = discord.Embed(description="**Arguments missing**",color=settings.error_color))
     elif isinstance(error, commands.CommandNotFound):
         await ctx.send(embed = discord.Embed(description="**Command not found plessen usen ;help**",color=settings.error_color))
+    elif isinstance(error, commands.MissingRole):
+        await ctx.send(embed = discord.Embed(description="**You miss the role required for this command**",color=settings.error_color))
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.send(embed = discord.Embed(description="**You don't have permissions to use this command**",color=settings.error_color))
+    elif isinstance(error, commands.MissingAnyRole):
+        await ctx.send(embed = discord.Embed(description="**You miss the role required for this command**",color=settings.error_color))
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send(embed = discord.Embed(description="**Bad Argument given**",color=settings.error_color))
     else:
         print(error)
 

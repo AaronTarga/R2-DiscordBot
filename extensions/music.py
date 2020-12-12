@@ -119,7 +119,7 @@ class Music(commands.Cog):
     @commands.command(pass_context=True)
     async def join(self, ctx):
         """Joins a voice channel"""
-        join_channel(ctx)
+        await join_channel(ctx)
 
     @commands.command()
     async def volume(self, ctx, volume: int):

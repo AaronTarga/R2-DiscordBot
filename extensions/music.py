@@ -58,7 +58,7 @@ global_volume = defaultdict(lambda: 0.5)
 timeout = 60
 
 
-async def join(ctx):
+async def join_channel(ctx):
     if ctx.message.author.voice:
         channel = ctx.message.author.voice.channel
 
@@ -96,7 +96,7 @@ async def playing_sound(ctx, filename):
         ctx.voice_client.pause()
     else:
         try:
-            await join(ctx)
+            await join_channel(ctx)
         except:
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
@@ -119,7 +119,7 @@ class Music(commands.Cog):
     @commands.command(pass_context=True)
     async def join(self, ctx):
         """Joins a voice channel"""
-        join(ctx)
+        join_channel(ctx)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -236,7 +236,7 @@ class Music(commands.Cog):
     async def play(self, ctx, url, playlist: int = 0):
         """Plays from a url (almost anything youtube_dl supports) when adding number greater 1 at end it queues playlists"""
         try:
-            await join(ctx)
+            await join_channel(ctx)
         except:
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 

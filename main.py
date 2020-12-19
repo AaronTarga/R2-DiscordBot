@@ -7,6 +7,8 @@ import settings
 
 bot = commands.Bot(command_prefix=';')
 
+delete_message_ids = {}
+
 @bot.event
 async def on_ready():
     await bot.change_presence(status=discord.Status.idle, activity=discord.Game('Hello, there!'))
@@ -71,6 +73,16 @@ async def on_command_error(ctx,error):
     else:
         print(error)
 
+
+@bot.event
+async def on_reaction_add(reaction,user):
+    channel = reaction.message.channel
+    message_id = reaction.message.id
+    if reaction.emoji == '✅' and message_id in delete_message_ids:
+        if str(user) != 'R2D2#4772':
+            deleted = await channel.purge(limit=delete_message_ids[message_id])
+            await channel.send(embed = discord.Embed(description='**Deleted {} message(s)**'.format(len(deleted) - 2),color=settings.color))
+            delete_message_ids.pop(message_id)
 
 for fileName in os.listdir('./extensions'):
     if fileName.endswith('.py'):

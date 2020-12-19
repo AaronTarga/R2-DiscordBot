@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import settings
+import main
 
 class Super(commands.Cog):
 
@@ -16,14 +17,10 @@ class Super(commands.Cog):
         "Cleans given amount of messages(only for people who can delete messages)"
         if amount < 1:
             return await ctx.send(embed=discord.Embed(description="Amount of deleted messages must be greater than zero!", color=settings.error_color))
-        amount = amount + 1 #+1 to delete clean message itselft too
-        deleted = await ctx.channel.purge(limit=amount)
-        await ctx.send(embed = discord.Embed(description='**Deleted {} message(s)**'.format(len(deleted)),color=settings.color))
-
-@client.event
-async def on_reaction_add(reaction,user):
-    channel = reaction.message.channel
-    await ctx.send_message(channel, '{} has reacted with {} to the message: {}'.format(user.name,reaction.emoji,reaction.message.content))
+        message = await ctx.send(embed = discord.Embed(description='Check if you want to delete {} message(s).'.format(amount),color=settings.color))
+        await message.add_reaction('✅')
+        amount = amount + 2 #+2 to delete clean message itself and confirm clean message
+        main.delete_message_ids[message.id] = amount
 
 
 def setup(client):

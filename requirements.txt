@@ -45,7 +45,7 @@ youtube-dl==2021.6.6
 requests==2.25.1
 six==1.15.0
 typing-extensions==3.7.4.3
-urllib3==1.26.4
+urllib3==1.26.5
 yarl==1.6.3
 youtube-dl==2021.4.1
 >>>>>>> 68e388649ae5c36c5086033adc9ec4184bac9b03

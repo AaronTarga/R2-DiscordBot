@@ -91,7 +91,7 @@ async def resume_prev(ctx, backup):
 
 async def playing_sound(ctx, filename):
     backup = None
-    if ctx.voice_client.is_playing():
+    if ctx.voice_client and ctx.voice_client.is_playing():
         backup = ctx.voice_client.source
         ctx.voice_client.pause()
     else:

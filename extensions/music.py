@@ -1,5 +1,4 @@
 import discord
-import youtube_dl
 import os
 import asyncio
 from discord.ext import commands
@@ -9,24 +8,11 @@ import signal
 import time
 from collections import defaultdict
 import re
+import youtube_dl
+
 
 # Suppress noise about console usage from errors
-youtube_dl.utils.bug_reports_message = lambda: ''
-
-ytdl_format_options_playlist = {
-    'format': 'bestaudio/best',
-    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-    'restrictfilenames': True,
-    'nocheckcertificate': True,
-    'ignoreerrors': False,
-    'logtostderr': False,
-    'quiet': True,
-    'no_warnings': True,
-    'flat-playlist': True,
-    'default_search': 'auto',
-    # bind to ipv4 since ipv6 addresses cause issues sometimes
-    # 'source_address': '0.0.0.0'
-}
+# youtube_dl.utils.bug_reports_message = lambda: ''
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -44,6 +30,7 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
+    'before_options': '-nostdin',
     'options': '-vn'
 }
 
@@ -55,7 +42,7 @@ song_titles = defaultdict(list)
 
 global_volume = defaultdict(lambda: 0.5)
 
-timeout = 60
+timeout = 120
 
 
 async def join_channel(ctx):
@@ -128,7 +115,7 @@ class Music(commands.Cog):
         if volume > 100 or volume < 0:
             return await ctx.send(embed=discord.Embed(description="Volume can only be set between 0 and 100", color=settings.error_color))
 
-        if ctx.voice_client is not None:
+        if ctx.voice_client is not None and ctx.voice_client.source is not None:
             ctx.voice_client.source.volume = float(volume) / 100.0
 
         global global_volume
@@ -173,6 +160,7 @@ class Music(commands.Cog):
                 queues[ctx.guild.id].pop(index)
             signal.alarm(0)
             return
+
         # cancel interrupt
         signal.alarm(0)
         if queues[ctx.guild.id]:
@@ -201,7 +189,6 @@ class Music(commands.Cog):
 
     @staticmethod
     async def play_music(ctx, url=None):
-
         if url is None:
             if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
                 queues[ctx.guild.id].pop(0)
@@ -211,7 +198,6 @@ class Music(commands.Cog):
                     queues[ctx.guild.id].pop(0)
                     song_titles[ctx.guild.id].pop(0)
                 await ctx.send(embed=discord.Embed(description="There are no more songs to be played!", color=settings.color))
-                Music.delete_music_files()
                 await Music.sleep_stop(ctx)
                 return
         else:
@@ -220,39 +206,39 @@ class Music(commands.Cog):
                 await Music.append_song(ctx, True)
                 return
             else:
+                queues[ctx.guild.id] = []
                 queues[ctx.guild.id].append(url)
                 await Music.append_song(ctx)
         if queues[ctx.guild.id]:
-            data = ytdl.extract_info(queues[ctx.guild.id][0], download=True)
-            filename = ytdl.prepare_filename(data)
+
+            video_data = ytdl.extract_info(queues[ctx.guild.id][0],download=False)
+
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(
-                filename, **ffmpeg_options), volume=global_volume[ctx.guild.id])
+                video_data['url'], **ffmpeg_options), volume=global_volume[ctx.guild.id])
             ctx.voice_client.play(source,
                                   after=lambda e: print('Player error: %s' % e) if e else Music.play_next(ctx))
 
-            await ctx.send(embed=discord.Embed(title="**Now playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(data.get('title'), queues[ctx.guild.id][0], int(global_volume[ctx.guild.id]*100)), color=settings.color))
+            await ctx.send(embed=discord.Embed(title="**Now playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(video_data.get('title'), queues[ctx.guild.id][0], int(global_volume[ctx.guild.id]*100)), color=settings.color))
 
     @commands.command()
-    async def play(self, ctx, url, playlist: int = 0):
-        """Plays from a url (almost anything youtube_dl supports) when adding number greater 1 at end it queues playlists"""
+    async def play(self, ctx, url):
+        """Plays music from a youtube url using youtube_dl"""
         try:
             await join_channel(ctx)
         except:
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
         global ytdl
-        if playlist:
-            ytdl = youtube_dl.YoutubeDL(ytdl_format_options_playlist)
-        else:
-            ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+        ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
         asyncio.run_coroutine_threadsafe(
             Music.play_music(ctx, url), ctx.voice_client.loop)
 
     @staticmethod
     def play_next(ctx):
-        asyncio.run_coroutine_threadsafe(
-            Music.play_music(ctx), ctx.voice_client.loop)
+        if ctx.voice_client:
+            asyncio.run_coroutine_threadsafe(
+                Music.play_music(ctx), ctx.voice_client.loop)
 
     @commands.command()
     async def skip(self, ctx, count: int = 1):
@@ -268,14 +254,15 @@ class Music(commands.Cog):
             for i in range(1, count):
                 queues[ctx.guild.id].pop(0)
                 song_titles[ctx.guild.id].pop(0)
-            await ctx.voice_client.stop()
+
+            # ctx.voice_client.source = discord.FFmpegPCMAudio(queues[ctx.guild.id][0], **ffmpeg_options)
+            ctx.voice_client.stop()
         else:
             if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
                 await ctx.send(embed=discord.Embed(description="You can only skip positive numbers and to songs in the queue, not greater or smaller numbers!", color=settings.error_color))
             else:
                 if ctx.voice_client.is_playing():
-                    print(ctx.voice_client)
-                    await ctx.voice_client.stop()
+                    ctx.voice_client.stop()
                 else:
                     await ctx.send(embed=discord.Embed(description="There are no songs to skip!", color=settings.error_color))
 
@@ -316,7 +303,7 @@ class Music(commands.Cog):
         """clears queue"""
         await Music.clear(ctx)
         if ctx.voice_client is not None and ctx.voice_client.is_playing():
-            await ctx.voice_client.stop()
+            ctx.voice_client.stop()
 
     @staticmethod
     async def clear(ctx):
@@ -326,7 +313,6 @@ class Music(commands.Cog):
         queues[ctx.guild.id] = []
         song_titles[ctx.guild.id] = []
 
-        Music.delete_music_files()
 
         await ctx.send(embed=discord.Embed(description="**Queue has been cleared!**", color=settings.color))
 

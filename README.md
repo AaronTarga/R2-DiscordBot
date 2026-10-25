@@ -175,6 +175,22 @@ send messages in the channel, and to connect and speak in the voice channel.
   bot.
 - **The bot cannot join or speak:** Check the bot's server and channel
   permissions, including Connect and Speak.
+- **yt-dlp says "Sign in to confirm you're not a bot":** Export your YouTube
+  cookies in Netscape format to a `.txt` file as described in the
+  [yt-dlp cookie instructions](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
+  Keep this file private; it can grant access to your account. For a direct run,
+  set `YOUTUBE_COOKIES_FILE` to the file's path before starting the bot:
+
+  ```powershell
+  $env:YOUTUBE_COOKIES_FILE = "C:\path\to\cookies.txt"
+  python main.py
+  ```
+
+  With Docker Compose, put the file at `cookies/cookies.txt` and set
+  `YOUTUBE_COOKIES_FILE=/run/secrets/youtube-cookies/cookies.txt` in `.env`.
+  The Compose service mounts the `cookies` directory read-only. Leave the
+  variable unset when cookies are not needed. Cookie sessions expire; refresh
+  the export if YouTube starts rejecting it.
 - **`ModuleNotFoundError`:** Activate the project's virtual environment and
   install the dependencies with `python -m pip install -r requirements.txt`.
 

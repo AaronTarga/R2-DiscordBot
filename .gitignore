@@ -4,3 +4,5 @@ __pycache__
 extensions/__pycache__/**
 .vscode
 r2py/
+cookies/*
+!cookies/.gitkeep

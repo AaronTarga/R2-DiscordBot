@@ -25,6 +25,10 @@ ytdl_format_options = {
     # 'source_address': '0.0.0.0'
 }
 
+youtube_cookies_file = os.getenv("YOUTUBE_COOKIES_FILE")
+if youtube_cookies_file:
+    ytdl_format_options["cookiefile"] = youtube_cookies_file
+
 ffmpeg_options = {
     'before_options': '-nostdin',
     'options': '-vn'

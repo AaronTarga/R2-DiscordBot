@@ -5,3 +5,6 @@ services:
     init: true
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in .env}
+      YOUTUBE_COOKIES_FILE: ${YOUTUBE_COOKIES_FILE:-}
+    volumes:
+      - ./cookies:/run/secrets/youtube-cookies:ro

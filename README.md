@@ -177,3 +177,27 @@ send messages in the channel, and to connect and speak in the voice channel.
   permissions, including Connect and Speak.
 - **`ModuleNotFoundError`:** Activate the project's virtual environment and
   install the dependencies with `python -m pip install -r requirements.txt`.
+
+## Run with Docker
+
+Docker Compose builds an image with FFmpeg and the Python dependencies, then
+starts the bot using the `DISCORD_TOKEN` environment variable.
+
+1. Copy `.env.example` to `.env` and set `DISCORD_TOKEN` to your Discord bot
+   token.
+2. In the Discord Developer Portal, enable **Message Content Intent** for the
+   bot application. The bot uses `;`-prefixed commands, which require this
+   privileged intent both in the application settings and in the bot code.
+3. From the repository directory, run:
+
+   ```sh
+   docker compose up --build -d
+   ```
+
+4. Follow the bot logs with `docker compose logs -f` and stop it with
+   `docker compose down`.
+
+The token is not copied into the image. Keep `.env` private; it is excluded
+from Git and the Docker build context. The Docker image uses
+`settings.docker.py` for the container's settings, so the local `settings.py`
+file is not required in the image.

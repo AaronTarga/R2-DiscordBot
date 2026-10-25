@@ -1,0 +1,7 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in .env}

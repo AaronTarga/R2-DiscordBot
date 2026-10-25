@@ -5,8 +5,6 @@ import asyncio
 from discord.ext import commands
 import glob
 import settings
-import signal
-import time
 from collections import defaultdict
 import re
 import yt_dlp
@@ -32,15 +30,14 @@ ffmpeg_options = {
     'options': '-vn'
 }
 
-ytdl = None
-
 # using defaultdicts in order to make a list for each server where server id is the key
 queues = defaultdict(list)
 song_titles = defaultdict(list)
 
 global_volume = defaultdict(lambda: 0.5)
 
-timeout = 120
+idle_timeout = 120
+song_load_timeout = 20
 ffmpeg_not_found_message = (
     "FFmpeg was not found. Install FFmpeg, add it to PATH, and restart the bot."
 )
@@ -58,6 +55,22 @@ async def require_ffmpeg(ctx):
             color=settings.error_color,
         ))
     return executable
+
+
+async def extract_song_info(url, deadline=None):
+    loop = asyncio.get_running_loop()
+    remaining = song_load_timeout
+    if deadline is not None:
+        remaining = max(deadline - loop.time(), 0)
+    if remaining == 0:
+        raise asyncio.TimeoutError
+
+    extraction = loop.run_in_executor(
+        None,
+        lambda: yt_dlp.YoutubeDL(ytdl_format_options).extract_info(
+            url, download=False),
+    )
+    return await asyncio.wait_for(extraction, timeout=remaining)
 
 
 async def join_channel(ctx):
@@ -144,7 +157,7 @@ class Music(commands.Cog):
 
     @staticmethod
     async def sleep_stop(ctx):
-        await asyncio.sleep(timeout)
+        await asyncio.sleep(idle_timeout)
         if not queues[ctx.guild.id] or len(queues[ctx.guild.id]) < 1:
             if ctx.voice_client != None:
                 await stop(ctx)
@@ -155,34 +168,33 @@ class Music(commands.Cog):
         await stop(ctx)
 
     @staticmethod
-    def music_not_found_handler(signum, frame):
-        print("Timeout has been reached")
-        raise Exception("end of time")
-
-    @staticmethod
-    async def append_song(ctx, appended=False):
+    async def append_song(ctx, appended=False, deadline=None):
         # could take long if it has to load big playlists
         await ctx.send(embed=discord.Embed(description="Loading song/songs from url!", color=settings.color))
         index = 0
         if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
             index = len(queues[ctx.guild.id]) - 1
 
-        # if it isn't finished until 20 seconds it gets interrupted
-        signal.signal(signal.SIGALRM, Music.music_not_found_handler)
-        signal.alarm(timeout)
-
         try:
-            data = ytdl.extract_info(
-                queues[ctx.guild.id][index], download=False)
-        except Exception:
-            await ctx.send(embed=discord.Embed(description=" Couldn't retrieve song data", color=settings.error_color))
+            data = await extract_song_info(
+                queues[ctx.guild.id][index], deadline)
+        except asyncio.TimeoutError:
+            await ctx.send(embed=discord.Embed(
+                description=f"Song loading timed out after {song_load_timeout} seconds.",
+                color=settings.error_color,
+            ))
             if queues[ctx.guild.id]:
                 queues[ctx.guild.id].pop(index)
-            signal.alarm(0)
+            return
+        except Exception:
+            await ctx.send(embed=discord.Embed(
+                description="Couldn't retrieve song data.",
+                color=settings.error_color,
+            ))
+            if queues[ctx.guild.id]:
+                queues[ctx.guild.id].pop(index)
             return
 
-        # cancel interrupt
-        signal.alarm(0)
         if queues[ctx.guild.id]:
             if 'entries' in data:
                 queues[ctx.guild.id].pop(index)
@@ -213,6 +225,7 @@ class Music(commands.Cog):
         if executable is None:
             return
 
+        deadline = asyncio.get_running_loop().time() + song_load_timeout
         if url is None:
             if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
                 queues[ctx.guild.id].pop(0)
@@ -227,15 +240,36 @@ class Music(commands.Cog):
         else:
             if queues[ctx.guild.id]:
                 queues[ctx.guild.id].append(url)
-                await Music.append_song(ctx, True)
+                await Music.append_song(ctx, True, deadline)
                 return
             else:
                 queues[ctx.guild.id] = []
                 queues[ctx.guild.id].append(url)
-                await Music.append_song(ctx)
-        if queues[ctx.guild.id]:
+                await Music.append_song(ctx, deadline=deadline)
+        while queues[ctx.guild.id]:
+            error_message = None
+            try:
+                video_data = await extract_song_info(
+                    queues[ctx.guild.id][0], deadline)
+            except asyncio.TimeoutError:
+                error_message = (
+                    f"Song loading timed out after {song_load_timeout} seconds."
+                )
+            except Exception:
+                error_message = "Couldn't retrieve song data."
 
-            video_data = ytdl.extract_info(queues[ctx.guild.id][0],download=False)
+            if error_message is not None:
+                await ctx.send(embed=discord.Embed(
+                    description=error_message,
+                    color=settings.error_color,
+                ))
+                queues[ctx.guild.id].pop(0)
+                if song_titles[ctx.guild.id]:
+                    song_titles[ctx.guild.id].pop(0)
+                deadline = (
+                    asyncio.get_running_loop().time() + song_load_timeout
+                )
+                continue
 
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(
                 video_data['url'], executable=executable, **ffmpeg_options),
@@ -244,6 +278,7 @@ class Music(commands.Cog):
                                   after=lambda e: print('Player error: %s' % e) if e else Music.play_next(ctx))
 
             await ctx.send(embed=discord.Embed(title="**Now playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(video_data.get('title'), queues[ctx.guild.id][0], int(global_volume[ctx.guild.id]*100)), color=settings.color))
+            return
 
     @commands.command()
     async def play(self, ctx, url):
@@ -256,11 +291,7 @@ class Music(commands.Cog):
         except:
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
-        global ytdl
-        ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
-
-        asyncio.run_coroutine_threadsafe(
-            Music.play_music(ctx, url), ctx.voice_client.loop)
+        await Music.play_music(ctx, url)
 
     @staticmethod
     def play_next(ctx):

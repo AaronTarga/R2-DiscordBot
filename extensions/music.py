@@ -1,5 +1,6 @@
 import discord
 import os
+import shutil
 import asyncio
 from discord.ext import commands
 import glob
@@ -40,6 +41,23 @@ song_titles = defaultdict(list)
 global_volume = defaultdict(lambda: 0.5)
 
 timeout = 120
+ffmpeg_not_found_message = (
+    "FFmpeg was not found. Install FFmpeg, add it to PATH, and restart the bot."
+)
+
+
+def find_ffmpeg():
+    return shutil.which("ffmpeg")
+
+
+async def require_ffmpeg(ctx):
+    executable = find_ffmpeg()
+    if executable is None:
+        await ctx.send(embed=discord.Embed(
+            description=ffmpeg_not_found_message,
+            color=settings.error_color,
+        ))
+    return executable
 
 
 async def join_channel(ctx):
@@ -74,6 +92,10 @@ async def resume_prev(ctx, backup):
 
 
 async def playing_sound(ctx, filename):
+    executable = await require_ffmpeg(ctx)
+    if executable is None:
+        return
+
     backup = None
     if ctx.voice_client and ctx.voice_client.is_playing():
         backup = ctx.voice_client.source
@@ -87,7 +109,8 @@ async def playing_sound(ctx, filename):
     dirname = os.path.dirname(__file__)
     filename = os.path.join(dirname, filename)
     source = discord.PCMVolumeTransformer(
-        discord.FFmpegPCMAudio(filename), volume=global_volume[ctx.guild.id])
+        discord.FFmpegPCMAudio(filename, executable=executable),
+        volume=global_volume[ctx.guild.id])
 
     ctx.voice_client.play(source,
                           after=lambda e: print('Player error: %s' % e) if e else None)
@@ -186,6 +209,10 @@ class Music(commands.Cog):
 
     @staticmethod
     async def play_music(ctx, url=None):
+        executable = await require_ffmpeg(ctx)
+        if executable is None:
+            return
+
         if url is None:
             if queues[ctx.guild.id] and len(queues[ctx.guild.id]) > 1:
                 queues[ctx.guild.id].pop(0)
@@ -211,7 +238,8 @@ class Music(commands.Cog):
             video_data = ytdl.extract_info(queues[ctx.guild.id][0],download=False)
 
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(
-                video_data['url'], **ffmpeg_options), volume=global_volume[ctx.guild.id])
+                video_data['url'], executable=executable, **ffmpeg_options),
+                volume=global_volume[ctx.guild.id])
             ctx.voice_client.play(source,
                                   after=lambda e: print('Player error: %s' % e) if e else Music.play_next(ctx))
 
@@ -220,6 +248,9 @@ class Music(commands.Cog):
     @commands.command()
     async def play(self, ctx, url):
         """Plays music from a youtube url using youtube_dl"""
+        if await require_ffmpeg(ctx) is None:
+            return
+
         try:
             await join_channel(ctx)
         except:
@@ -267,8 +298,11 @@ class Music(commands.Cog):
     async def current(self, ctx):
         """Gives info about the current song"""
 
-        if ctx.voice_client is None or not ctx.voice_client.is_playing():
+        if ctx.voice_client is None:
             return await ctx.send(embed=discord.Embed(description="Not connected to a voice channel.", color=settings.error_color))
+
+        if not ctx.voice_client.is_playing():
+            return await ctx.send(embed=discord.Embed(description="No song is currently playing.", color=settings.error_color))
 
         if song_titles[ctx.guild.id]:
             await ctx.send(embed=discord.Embed(title="**Currently playing:**", description="[{}]({})\n\n  **Volume:** {}%".format(song_titles[ctx.guild.id][0], queues[ctx.guild.id][0], int(global_volume[ctx.guild.id]*100)), color=settings.color))

@@ -5,9 +5,17 @@ import os
 import sys
 import settings
 
-bot = commands.Bot(command_prefix=';')
+intents = discord.Intents.default()
+intents.message_content = True
 
-delete_message_ids = {}
+
+class R2Bot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix=';', intents=intents)
+        self.delete_message_ids: dict[int, int] = {}
+
+
+bot = R2Bot()
 
 @bot.event
 async def on_ready():
@@ -40,7 +48,7 @@ async def reloadSingle(ctx, extension):
 @commands.has_permissions(administrator=True)
 async def reloadAll(ctx):
     """Reloads all extensions(only for admins)"""
-    for fileName in os.listdir('./extensions'):
+    for fileName in sorted(os.listdir('./extensions')):
         if fileName.endswith('.py'):
             bot.unload_extension(f'extensions.{fileName[:-3]}')
             bot.load_extension(f'extensions.{fileName[:-3]}')
@@ -61,7 +69,8 @@ async def on_command_error(ctx,error):
     if isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(embed = discord.Embed(description="**Arguments missing**",color=settings.error_color))
     elif isinstance(error, commands.CommandNotFound):
-        await ctx.send(embed = discord.Embed(description="**Command not found plessen usen ;help**",color=settings.error_color))
+        await ctx.send(embed = discord.Embed(description="**Command not found plessen usen ;"
+        "**",color=settings.error_color))
     elif isinstance(error, commands.MissingRole):
         await ctx.send(embed = discord.Embed(description="**You miss the role required for this command**",color=settings.error_color))
     elif isinstance(error, commands.MissingPermissions):
@@ -78,13 +87,13 @@ async def on_command_error(ctx,error):
 async def on_reaction_add(reaction,user):
     channel = reaction.message.channel
     message_id = reaction.message.id
-    if reaction.emoji == '✅' and message_id in delete_message_ids:
+    if reaction.emoji == '✅' and message_id in bot.delete_message_ids:
         if str(user) != 'R2D2#4772':
-            deleted = await channel.purge(limit=delete_message_ids[message_id])
+            deleted = await channel.purge(limit=bot.delete_message_ids[message_id])
             await channel.send(embed = discord.Embed(description='**Deleted {} message(s)**'.format(len(deleted) - 2),color=settings.color))
-            delete_message_ids.pop(message_id)
+            bot.delete_message_ids.pop(message_id)
 
-for fileName in os.listdir('./extensions'):
+for fileName in sorted(os.listdir('./extensions')):
     if fileName.endswith('.py'):
         bot.load_extension(f'extensions.{fileName[:-3]}')
 

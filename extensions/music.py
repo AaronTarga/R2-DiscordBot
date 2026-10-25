@@ -8,17 +8,14 @@ import signal
 import time
 from collections import defaultdict
 import re
-import youtube_dl
+import yt_dlp
 
 
 # Suppress noise about console usage from errors
-# youtube_dl.utils.bug_reports_message = lambda: ''
-
 ytdl_format_options = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
-    'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
     'quiet': True,
@@ -229,7 +226,7 @@ class Music(commands.Cog):
             return await ctx.send(embed=discord.Embed(description="Must be in voice channel to play music.", color=settings.error_color))
 
         global ytdl
-        ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
+        ytdl = yt_dlp.YoutubeDL(ytdl_format_options)
 
         asyncio.run_coroutine_threadsafe(
             Music.play_music(ctx, url), ctx.voice_client.loop)

@@ -44,7 +44,7 @@ class Manage(commands.Cog):
         if member == None:
             return
 
-        await ctx.send(embed = discord.Embed(description="**{}**".format(member.avatar_url),color=settings.color))
+        await ctx.send(embed = discord.Embed(description="**{}**".format(member.display_avatar),color=settings.color))
 
     @commands.command()
     @commands.has_role("Owner")

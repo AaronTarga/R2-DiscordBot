@@ -1,7 +1,6 @@
 import discord
 from discord.ext import commands
 import settings
-import main
 
 class Super(commands.Cog):
 
@@ -20,7 +19,7 @@ class Super(commands.Cog):
         message = await ctx.send(embed = discord.Embed(description='Check if you want to delete {} message(s).'.format(amount),color=settings.color))
         await message.add_reaction('✅')
         amount = amount + 2 #+2 to delete clean message itself and confirm clean message
-        main.delete_message_ids[message.id] = amount
+        self.client.delete_message_ids[message.id] = amount
 
 
 def setup(client):

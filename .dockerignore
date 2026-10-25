@@ -1,0 +1,9 @@
+.git
+.gitignore
+.venv
+r2py
+__pycache__
+**/__pycache__
+.vscode
+.env
+settings.py

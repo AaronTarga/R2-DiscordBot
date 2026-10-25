@@ -282,7 +282,7 @@ class Music(commands.Cog):
 
     @commands.command()
     async def play(self, ctx, url):
-        """Plays music from a youtube url using youtube_dl"""
+        """Plays music from a YouTube URL using yt-dlp."""
         if await require_ffmpeg(ctx) is None:
             return
 

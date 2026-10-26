@@ -1,3 +1,5 @@
+FROM denoland/deno:bin-2.9.8 AS deno
+
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,6 +10,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+COPY --from=deno /deno /usr/local/bin/deno
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip \

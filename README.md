@@ -178,8 +178,10 @@ send messages in the channel, and to connect and speak in the voice channel.
 - **yt-dlp says "Sign in to confirm you're not a bot":** Export your YouTube
   cookies in Netscape format to a `.txt` file as described in the
   [yt-dlp cookie instructions](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
-  Keep this file private; it can grant access to your account. For a direct run,
-  set `YOUTUBE_COOKIES_FILE` to the file's path before starting the bot:
+  The export must contain a current signed-in YouTube session; a stale, logged-out,
+  or unsupported export will not bypass the check. Keep this file private; it can
+  grant access to your account. For a direct run, set `YOUTUBE_COOKIES_FILE` to
+  the file's path before starting the bot:
 
   ```powershell
   $env:YOUTUBE_COOKIES_FILE = "C:\path\to\cookies.txt"
@@ -188,9 +190,36 @@ send messages in the channel, and to connect and speak in the voice channel.
 
   With Docker Compose, put the file at `cookies/cookies.txt` and set
   `YOUTUBE_COOKIES_FILE=/run/secrets/youtube-cookies/cookies.txt` in `.env`.
-  The Compose service mounts the `cookies` directory read-only. Leave the
-  variable unset when cookies are not needed. Cookie sessions expire; refresh
-  the export if YouTube starts rejecting it.
+  The Compose service mounts the `cookies` directory read-only. After changing
+  `.env`, recreate the container so it receives the updated environment:
+
+  ```sh
+  docker compose up -d --force-recreate
+  ```
+
+  To check that the configured path exists and is readable inside the container
+  without displaying the cookie contents, run:
+
+  ```sh
+  docker compose exec bot python -c "import os,pathlib; value=os.getenv('YOUTUBE_COOKIES_FILE'); p=pathlib.Path(value) if value else None; print('configured:', bool(value), 'file:', bool(p and p.is_file()), 'readable:', bool(p and p.is_file() and os.access(p, os.R_OK)), 'bytes:', p.stat().st_size if p and p.is_file() else 0)"
+  ```
+
+  If the file is missing, empty, or unreadable, check the host file location,
+  `.env` value, and container configuration. If it is readable but YouTube still
+  rejects requests, create a fresh Netscape-format export from a browser session
+  signed in to YouTube and try again; cookies do not guarantee that YouTube will
+  allow the request. Leave the variable unset when cookies are not needed.
+- **yt-dlp says "Requested format is not available":** YouTube extraction may
+  require a JavaScript runtime to solve its challenges. The Docker image includes
+  Deno; rebuild and recreate it after updating:
+
+  ```sh
+  docker compose up -d --build --force-recreate
+  ```
+
+  For a direct run, install a supported JavaScript runtime such as Deno and make
+  sure it is available on `PATH`. If the error persists, yt-dlp may not be able
+  to access formats for that video or YouTube may require additional verification.
 - **`ModuleNotFoundError`:** Activate the project's virtual environment and
   install the dependencies with `python -m pip install -r requirements.txt`.
 

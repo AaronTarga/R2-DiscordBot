@@ -6,5 +6,6 @@ services:
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN:?Set DISCORD_TOKEN in .env}
       YOUTUBE_COOKIES_FILE: ${YOUTUBE_COOKIES_FILE:-}
+      YOUTUBE_VISITOR_DATA: ${YOUTUBE_VISITOR_DATA:-}
     volumes:
       - ./cookies:/run/secrets/youtube-cookies:ro

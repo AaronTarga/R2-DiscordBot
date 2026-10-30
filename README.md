@@ -180,13 +180,19 @@ send messages in the channel, and to connect and speak in the voice channel.
   [yt-dlp cookie instructions](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
   The export must contain a current signed-in YouTube session; a stale, logged-out,
   or unsupported export will not bypass the check. Keep this file private; it can
-  grant access to your account. For a direct run, set `YOUTUBE_COOKIES_FILE` to
-  the file's path before starting the bot:
+  grant access to your account. The bot also skips YouTube's
+  webpage/config requests to avoid relying on the expiring webpage cookies. If
+  you have a YouTube visitor data value, set `YOUTUBE_VISITOR_DATA` as well; for
+  Docker, add it to `.env`, and for a direct run:
 
   ```powershell
   $env:YOUTUBE_COOKIES_FILE = "C:\path\to\cookies.txt"
+  $env:YOUTUBE_VISITOR_DATA = "your-visitor-data-value"
   python main.py
   ```
+
+  `YOUTUBE_VISITOR_DATA` is optional. This workaround does not replace valid
+  cookies for videos that require signing in or age verification.
 
   With Docker Compose, put the file at `cookies/cookies.txt` and set
   `YOUTUBE_COOKIES_FILE=/run/secrets/youtube-cookies/cookies.txt` in `.env`.

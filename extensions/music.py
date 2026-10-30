@@ -10,6 +10,14 @@ import re
 import yt_dlp
 
 
+youtube_extractor_args = {
+    'player_skip': ['webpage', 'configs'],
+}
+youtube_visitor_data = os.getenv("YOUTUBE_VISITOR_DATA")
+if youtube_visitor_data:
+    youtube_extractor_args['visitor_data'] = [youtube_visitor_data]
+
+
 # Suppress noise about console usage from errors
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -21,6 +29,10 @@ ytdl_format_options = {
     'no_warnings': True,
     'noplaylist': True,
     'default_search': 'auto',
+    'extractor_args': {
+        'youtubetab': {'skip': ['webpage']},
+        'youtube': youtube_extractor_args,
+    },
     # bind to ipv4 since ipv6 addresses cause issues sometimes
     # 'source_address': '0.0.0.0'
 }

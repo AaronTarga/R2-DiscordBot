@@ -204,6 +204,12 @@ send messages in the channel, and to connect and speak in the voice channel.
   docker compose exec bot python -c "import os,pathlib; value=os.getenv('YOUTUBE_COOKIES_FILE'); p=pathlib.Path(value) if value else None; print('configured:', bool(value), 'file:', bool(p and p.is_file()), 'readable:', bool(p and p.is_file() and os.access(p, os.R_OK)), 'bytes:', p.stat().st_size if p and p.is_file() else 0)"
   ```
 
+   Fetch cookies
+
+   ```sh
+   yt-dlp --cookies-from-browser firefox  --cookies cookies/cookies.txt  https://youtu.be/x8jAY2CoOBg
+   ```
+
   If the file is missing, empty, or unreadable, check the host file location,
   `.env` value, and container configuration. If it is readable but YouTube still
   rejects requests, create a fresh Netscape-format export from a browser session
